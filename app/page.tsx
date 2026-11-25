@@ -1,69 +1,227 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useCallback, useDeferredValue, useState } from "react";
+import type { NetNode } from "@/lib/network";
+import { AlertCircle } from "lucide-react";
+import { CategoryBreakdown } from "@/components/CategoryBreakdown";
+import { CategoryFilters } from "@/components/CategoryFilters";
+import { CommodityRiskTable } from "@/components/CommodityRiskTable";
+import { FilterBar } from "@/components/FilterBar";
+import { ImportDataModal } from "@/components/ImportDataModal";
+import { KpiCards } from "@/components/KpiCards";
+import { LiveFeedTable } from "@/components/LiveFeedTable";
+import { Navbar } from "@/components/Navbar";
+import { SentimentDonutChart } from "@/components/SentimentDonutChart";
+import { SentimentTrendChart } from "@/components/SentimentTrendChart";
+import { ToastProvider, useToast } from "@/components/Toast";
+import { TrendingKeywords } from "@/components/TrendingKeywords";
+import { useSentimentData } from "@/hooks/useSentimentData";
+import { classifyAi, syncGoogleDrive } from "@/lib/api";
+import {
+  NO_CATEGORY_FILTERS,
+  type CategoryFilters as Cats,
+  type DateRange,
+  type DimKey,
+  type PlatformFilter,
+} from "@/lib/types";
+
+function Dashboard() {
+  const toast = useToast();
+  const [range, setRange] = useState<DateRange>("7d");
+  const [platform, setPlatform] = useState<PlatformFilter>("all");
+  const [search, setSearch] = useState("");
+  const [tag, setTag] = useState<string | null>(null);
+  const [cats, setCats] = useState<Cats>(NO_CATEGORY_FILTERS);
+  const setCat = useCallback((key: DimKey, value: string) => setCats((c) => ({ ...c, [key]: value })), []);
+  const [importOpen, setImportOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [classifying, setClassifying] = useState(false);
+
+  const deferredSearch = useDeferredValue(search);
+  const data = useSentimentData({ range, platform, search: deferredSearch, tag, cats });
+  const { refresh } = data;
+
+  /** Panggil /api/classify berulang kali sehingga tiada rekod menunggu (atau tiada kemajuan). */
+  const classifyAll = useCallback(async (): Promise<{ done: number; remaining: number; error?: string }> => {
+    let done = 0;
+    let remaining = 0;
+    for (let i = 0; i < 40; i++) {
+      const r = await classifyAi(500);
+      if (!r.enabled) return { done, remaining: 0 };
+      done += r.classified;
+      remaining = r.remaining;
+      if (r.remaining === 0) return { done, remaining };
+      if (r.classified === 0) return { done, remaining, error: r.errors[0] ?? "Tiada kemajuan." };
+    }
+    return { done, remaining };
+  }, []);
+
+  const handleClassify = useCallback(async () => {
+    setClassifying(true);
+    try {
+      const r = await classifyAll();
+      if (r.error) toast("error", `${r.done} siaran dikelas AI, ${r.remaining} masih menunggu. Ralat: ${r.error}`);
+      else toast("success", `${r.done.toLocaleString("en-US")} siaran dikelas semula oleh AI.`);
+    } catch (e) {
+      toast("error", e instanceof Error ? e.message : "Pengelasan AI gagal.");
+    } finally {
+      await refresh();
+      setClassifying(false);
+    }
+  }, [classifyAll, refresh, toast]);
+
+  const handleSync = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const r = await syncGoogleDrive();
+      const detail = `${r.filesProcessed} fail, ${r.foldersScanned} folder diimbas`;
+      const ai =
+        r.ai?.enabled && r.ai.classified > 0
+          ? ` ${r.ai.classified} dikelas AI${r.ai.remaining > 0 ? `, ${r.ai.remaining} menunggu` : ""}.`
+          : "";
+      if (r.errors.length > 0) {
+        toast("error", `${r.newRecords} rekod baharu disegerakkan (${detail}). Ralat: ${r.errors[0]}`);
+      } else if (r.newRecords === 0) {
+        toast("success", `Tiada rekod baharu. Semua data sudah dikemas kini (${detail}).${ai}`);
+      } else {
+        toast(
+          "success",
+          `${r.newRecords.toLocaleString("en-US")} rekod baharu disegerakkan (${detail}).` +
+            ai +
+            (r.partial ? " Tekan sekali lagi untuk fail yang tinggal." : ""),
+        );
+      }
+      if (r.ai && !r.ai.ok) toast("error", r.ai.error ?? "Pengelasan AI gagal.");
+      await refresh();
+    } catch (e) {
+      toast("error", e instanceof Error ? e.message : "Segerak Google Drive gagal.");
+    } finally {
+      setSyncing(false);
+    }
+  }, [toast, refresh]);
+  const handleImported = useCallback(() => void refresh(), [refresh]);
+
+  /** Klik nod graf: komoditi -> tag, topik/negeri -> penapis kategori, daerah/sumber -> carian. */
+  const isNodeActive = useCallback(
+    (n: NetNode) => {
+      if (n.kind === "komoditi") return tag?.toLowerCase() === `#${n.value}`;
+      if (n.kind === "topik") return cats.topic === n.value;
+      if (n.kind === "negeri") return cats.state === n.value;
+      return search.trim().toLowerCase() === n.value.toLowerCase();
+    },
+    [tag, cats.topic, cats.state, search],
+  );
+
+  const handleNodeSelect = useCallback(
+    (n: NetNode) => {
+      const active = isNodeActive(n);
+      if (n.kind === "komoditi") setTag(active ? null : `#${n.value}`);
+      else if (n.kind === "topik") setCat("topic", active ? "all" : n.value);
+      else if (n.kind === "negeri") setCat("state", active ? "all" : n.value);
+      else setSearch(active ? "" : n.value);
+    },
+    [isNodeActive, setCat],
+  );
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="min-h-screen bg-[#F8FAFC]">
+      <Navbar
+        search={search}
+        onSearchChange={setSearch}
+        onImportClick={() => setImportOpen(true)}
+        onSyncClick={handleSync}
+        syncing={syncing}
+      />
+
+      <main className="mx-auto max-w-[1440px] space-y-6 px-4 py-6 sm:px-6">
+        <FilterBar
+          range={range}
+          platform={platform}
+          onRangeChange={(v) => {
+            setRange(v);
+            setTag(null);
+          }}
+          onPlatformChange={(v) => {
+            setPlatform(v);
+            setTag(null);
+          }}
+          storage={data.storage}
+          today={data.today}
+          realtime={data.realtime}
+          aiModel={data.aiModel}
+          aiPending={data.aiPending}
+          classifying={classifying}
+          onClassify={handleClassify}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+
+        <CategoryFilters value={cats} onChange={setCat} onReset={() => setCats(NO_CATEGORY_FILTERS)} />
+
+        {data.error && (
+          <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>Gagal memuatkan data: {data.error}</p>
+          </div>
+        )}
+
+        {data.empty && !data.error && (
+          <div className="flex flex-col gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900 sm:flex-row sm:items-center sm:justify-between">
+            <p>Belum ada data. Tekan butang ini untuk menarik semua folder harian daripada Google Drive.</p>
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              className="h-9 shrink-0 rounded-lg bg-indigo-600 px-4 font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              {syncing ? "Menyegerak..." : "Sync Google Drive sekarang"}
+            </button>
+          </div>
+        )}
+
+        <KpiCards kpis={data.kpis} riskRed={data.risk.red} riskWatch={data.risk.watch} loading={data.loading} />
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[65fr_35fr]">
+          <SentimentTrendChart data={data.trend} loading={data.loading} />
+          <SentimentDonutChart data={data.breakdown} loading={data.loading} />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+
+        <CategoryBreakdown
+          categories={data.categories}
+          districts={data.districts}
+          filters={cats}
+          onSelect={setCat}
+          loading={data.loading}
+        />
+
+        <CommodityRiskTable summary={data.risk} selectedTag={tag} onSelectTag={setTag} loading={data.loading} />
+
+        <TrendingKeywords
+          keywords={data.keywords}
+          network={data.network}
+          selected={tag}
+          onSelect={setTag}
+          isNodeActive={isNodeActive}
+          onNodeSelect={handleNodeSelect}
+          loading={data.loading}
+        />
+
+        <LiveFeedTable
+          key={`${range}|${platform}|${deferredSearch}|${tag}|${Object.values(cats).join(",")}`}
+          rows={data.feed}
+          tag={tag}
+          onClearTag={() => setTag(null)}
+          loading={data.loading}
+          live={data.realtime}
+        />
       </main>
+
+      <ImportDataModal open={importOpen} onClose={() => setImportOpen(false)} onImported={handleImported} />
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <ToastProvider>
+      <Dashboard />
+    </ToastProvider>
   );
 }
