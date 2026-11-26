@@ -1,5 +1,6 @@
-import { Calendar, ChevronDown, Layers, Loader2, Radio, Sparkles } from "lucide-react";
-import { DATE_RANGE_OPTIONS, PLATFORM_OPTIONS } from "@/lib/constants";
+import { ChevronDown, Layers, Loader2, Radio, Sparkles } from "lucide-react";
+import { PLATFORM_OPTIONS } from "@/lib/constants";
+import { DatePeriodPicker } from "./DatePeriodPicker";
 import type { DateRange, PlatformFilter } from "@/lib/types";
 
 interface FilterBarProps {
@@ -9,6 +10,8 @@ interface FilterBarProps {
   onPlatformChange: (v: PlatformFilter) => void;
   storage: "supabase" | "local" | null;
   today: string | null;
+  /** Tarikh data terawal */
+  minDate: string | null;
   realtime: boolean;
   /** Model AI yang digunakan, null jika AI tidak dikonfigurasi */
   aiModel: string | null;
@@ -46,16 +49,10 @@ function Select<T extends string>({ label, icon, value, options, onChange }: Sel
   );
 }
 
-export function FilterBar({ range, platform, onRangeChange, onPlatformChange, storage, today, realtime, aiModel, aiPending, classifying, onClassify }: FilterBarProps) {
+export function FilterBar({ range, platform, onRangeChange, onPlatformChange, storage, today, minDate, realtime, aiModel, aiPending, classifying, onClassify }: FilterBarProps) {
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-      <Select
-        label="Julat tarikh"
-        icon={<Calendar className="h-4 w-4" />}
-        value={range}
-        options={DATE_RANGE_OPTIONS}
-        onChange={onRangeChange}
-      />
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start">
+      <DatePeriodPicker value={range} onChange={onRangeChange} today={today} minDate={minDate} />
       <Select
         label="Platform"
         icon={<Layers className="h-4 w-4" />}
@@ -63,7 +60,7 @@ export function FilterBar({ range, platform, onRangeChange, onPlatformChange, st
         options={PLATFORM_OPTIONS}
         onChange={onPlatformChange}
       />
-      <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+      <div className="flex flex-wrap items-center gap-2 sm:ml-auto sm:min-h-10">
         {today && (
           <span className="text-xs text-slate-500">
             Data terkini: <span className="font-mono font-medium text-slate-700">{today}</span>

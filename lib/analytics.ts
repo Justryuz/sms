@@ -16,22 +16,58 @@ export function addDays(ymd: string, n: number): string {
   return t.toISOString().slice(0, 10);
 }
 
-interface Window {
+export function daysBetween(a: string, b: string): number {
+  return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
+}
+
+export interface Window {
   start: string | null;
   end: string;
+  /** Bilangan hari dalam tempoh (null = semua rekod) */
+  days: number | null;
   prevStart: string | null;
   prevEnd: string | null;
 }
 
+/** Tempoh yang sama panjang sejurus sebelum `start..end`, untuk perbandingan KPI. */
+function withPrevious(start: string, end: string): Window {
+  const days = daysBetween(start, end) + 1;
+  return { start, end, days, prevStart: addDays(start, -days), prevEnd: addDays(start, -1) };
+}
+
+/**
+ * Tukar pilihan tempoh kepada julat tarikh. `today` ialah tarikh data terkini.
+ * Minggu semasa dipotong pada `today`, dan dibandingkan dengan hari yang sama pada minggu sebelumnya.
+ */
 export function dateWindow(range: DateRange, today: string): Window {
-  if (range === "all") return { start: null, end: today, prevStart: null, prevEnd: null };
-  const len = range === "today" ? 1 : range === "7d" ? 7 : 30;
-  return {
-    start: addDays(today, -(len - 1)),
-    end: today,
-    prevStart: addDays(today, -(2 * len - 1)),
-    prevEnd: addDays(today, -len),
-  };
+  switch (range.mode) {
+    case "all":
+      return { start: null, end: today, days: null, prevStart: null, prevEnd: null };
+    case "today":
+      return withPrevious(today, today);
+    case "7d":
+      return withPrevious(addDays(today, -6), today);
+    case "30d":
+      return withPrevious(addDays(today, -29), today);
+    case "day":
+      return withPrevious(range.date, range.date);
+    case "week": {
+      const full = addDays(range.start, 6);
+      const end = full > today && range.start <= today ? today : full;
+      // Banding dengan hari yang sama pada minggu sebelumnya (cth. Isnin–Rabu lawan Isnin–Rabu).
+      return {
+        start: range.start,
+        end,
+        days: daysBetween(range.start, end) + 1,
+        prevStart: addDays(range.start, -7),
+        prevEnd: addDays(end, -7),
+      };
+    }
+    case "custom": {
+      const [a, b] = range.start <= range.end ? [range.start, range.end] : [range.end, range.start];
+      return withPrevious(a, b);
+    }
+  }
 }
 
 function inWindow(r: SentimentRecord, start: string | null, end: string | null) {
@@ -290,7 +326,7 @@ export function buildDashboard(
 
   // Trend harian
   const byDate = new Map<string, TrendPoint>();
-  if (win.start && filters.range !== "today") {
+  if (win.start && (win.days ?? 0) > 1) {
     for (let d = win.start; d <= win.end; d = addDays(d, 1)) {
       byDate.set(d, { date: d, positif: 0, neutral: 0, negatif: 0 });
     }
@@ -389,11 +425,12 @@ function isValidRisk(r: CommodityRisk): boolean {
 /**
  * Penilaian terkini bagi setiap komoditi dalam julat tarikh.
  * Jika penilaian terkini tidak mencukupi, guna penilaian sah terakhir dalam julat
- * (untuk "Hari Ini", cari sehingga 7 hari ke belakang) dan tandakan sebagai lama.
+ * (untuk tempoh satu hari, cari sehingga 7 hari ke belakang) dan tandakan sebagai lama.
  */
 export function buildRiskSummary(risks: CommodityRisk[], range: DateRange, today: string): RiskSummary {
   const { start, end } = dateWindow(range, today);
-  const fallbackStart = range === "today" ? addDays(today, -6) : start;
+  const { days } = dateWindow(range, today);
+  const fallbackStart = days === 1 ? addDays(end, -6) : start;
 
   const latest = new Map<string, CommodityRisk>();
   const latestValid = new Map<string, CommodityRisk>();

@@ -2,6 +2,7 @@
 
 import { useCallback, useDeferredValue, useState } from "react";
 import type { NetNode } from "@/lib/network";
+import { rangeKey } from "@/lib/period";
 import { AlertCircle } from "lucide-react";
 import { CategoryBreakdown } from "@/components/CategoryBreakdown";
 import { CategoryFilters } from "@/components/CategoryFilters";
@@ -27,7 +28,7 @@ import {
 
 function Dashboard() {
   const toast = useToast();
-  const [range, setRange] = useState<DateRange>("7d");
+  const [range, setRange] = useState<DateRange>({ mode: "7d" });
   const [platform, setPlatform] = useState<PlatformFilter>("all");
   const [search, setSearch] = useState("");
   const [tag, setTag] = useState<string | null>(null);
@@ -147,6 +148,7 @@ function Dashboard() {
           }}
           storage={data.storage}
           today={data.today}
+          minDate={data.minDate}
           realtime={data.realtime}
           aiModel={data.aiModel}
           aiPending={data.aiPending}
@@ -204,7 +206,7 @@ function Dashboard() {
         />
 
         <LiveFeedTable
-          key={`${range}|${platform}|${deferredSearch}|${tag}|${Object.values(cats).join(",")}`}
+          key={`${rangeKey(range)}|${platform}|${deferredSearch}|${tag}|${Object.values(cats).join(",")}`}
           rows={data.feed}
           tag={tag}
           onClearTag={() => setTag(null)}

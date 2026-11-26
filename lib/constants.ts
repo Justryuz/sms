@@ -1,13 +1,19 @@
-import type { DateRange, PlatformFilter, Sentiment } from "./types";
+import type { DateMode, PlatformFilter, Sentiment } from "./types";
 
 export const TABLE = "sentiment_records";
 export const CRISIS_THRESHOLD = 30; // peratus sentimen negatif
 
-export const DATE_RANGE_OPTIONS: { value: DateRange; label: string }[] = [
+export const DATE_PRESET_OPTIONS: { value: DateMode; label: string }[] = [
   { value: "today", label: "Hari Ini" },
   { value: "7d", label: "7 Hari Lepas" },
   { value: "30d", label: "30 Hari Lepas" },
   { value: "all", label: "Semua Rekod (Termasuk Historical)" },
+];
+
+export const DATE_PICK_OPTIONS: { value: DateMode; label: string }[] = [
+  { value: "day", label: "Pilih Tarikh" },
+  { value: "week", label: "Pilih Minggu" },
+  { value: "custom", label: "Julat Tersuai" },
 ];
 
 export const PLATFORM_OPTIONS: { value: PlatformFilter; label: string }[] = [

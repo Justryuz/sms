@@ -95,7 +95,18 @@ Ada dua cara menjalankan server:
 
 ### Penapis
 
-- **Julat tarikh:** Hari Ini, 7 Hari Lepas (lalai), 30 Hari Lepas, atau Semua Rekod.
+- **Julat tarikh** ada dua kumpulan pilihan:
+  - **Pantas:** Hari Ini, 7 Hari Lepas (lalai), 30 Hari Lepas, atau Semua Rekod.
+  - **Pilih sendiri:**
+    - **Pilih Tarikh:** satu hari tertentu, guna kalendar.
+    - **Pilih Minggu:** minggu Isnin–Ahad. Pilih daripada senarai (cth. *Minggu 47 · 16–22 Nov 2026*). Butang **Minggu ini** membawa terus ke minggu terkini.
+    - **Julat Tersuai:** pilih tarikh mula dan akhir.
+  - Butang **◀ ▶** di kiri dan kanan kawalan beralih ke hari, minggu atau julat sebelah. Butang ini dimatikan apabila tiada data di luar julat.
+  - Baris **"Tempoh: ... · dibanding ..."** di bawah kawalan menunjukkan tarikh tepat yang dipaparkan, dan tempoh yang digunakan untuk perbandingan % dalam kad KPI.
+    - Untuk satu hari, perbandingan ialah hari sebelumnya.
+    - Untuk satu minggu, perbandingan ialah minggu sebelumnya.
+    - Untuk minggu semasa yang belum habis, cth. Isnin–Rabu, perbandingan ialah Isnin–Rabu minggu lepas, supaya adil.
+  - Semua kad, carta, panel risiko, graf rangkaian dan suapan mengikut tempoh ini.
   - "Hari ini" bermaksud **tarikh crawl terkini**. Kalau folder hari ini belum dimuat naik ke Drive, dashboard menggunakan hari terakhir yang ada data.
 - **Platform:** Semua, X, TikTok, Facebook, Threads, Instagram, atau Web / Berita.
 - Label "Data terkini" di sebelah kanan menunjukkan tarikh yang dijadikan "hari ini".
@@ -452,7 +463,7 @@ app/
     sync-drive/route.ts     POST — butang Sync | GET — sync harian (Bearer CRON_SECRET)
     ingest/route.ts         POST — import fail CSV/JSON manual
     auth/login, logout      Log masuk / keluar
-components/                 Navbar, FilterBar, CategoryFilters, KpiCards, SentimentTrendChart,
+components/                 Navbar, FilterBar, DatePeriodPicker, CategoryFilters, KpiCards, SentimentTrendChart,
                             SentimentDonutChart, CategoryBreakdown, CommodityRiskTable, TrendingKeywords,
                             KeywordNetwork (graf rangkaian, d3-force),
                             LiveFeedTable, ImportDataModal, Toast, Card
@@ -465,6 +476,7 @@ lib/
   sentiment-lexicon.ts      Pengelas sentimen kata kunci (sandaran)
   categorize.ts             Pengelas kategori: topik, jenis sumber, lokasi (negeri/daerah)
   categories.ts             Definisi 5 kategori untuk penapis & carta, kumpulan komoditi
+  period.ts                 Tempoh tarikh: minggu ISO (Isnin–Ahad), anjak ◀ ▶, format tarikh BM
   network.ts                Bina rangkaian kookurens entiti (komoditi, topik, negeri, daerah, sumber)
   commodity.ts              Seragamkan nama komoditi, warna band
   drive-source.ts           Baca Google Drive (API rasmi atau folder awam)

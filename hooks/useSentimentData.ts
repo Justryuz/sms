@@ -124,6 +124,11 @@ export function useSentimentData(filters: Filters) {
 
   const { range, platform, search, tag, cats } = filters;
   const today = useMemo(() => (loading ? null : anchorDate(records)), [loading, records]);
+  const minDate = useMemo(() => {
+    let min: string | null = null;
+    for (const r of records) if (!min || r.crawl_date < min) min = r.crawl_date;
+    return min;
+  }, [records]);
   const dashboard: Dashboard = useMemo(
     () => (today ? buildDashboard(records, { range, platform, search, tag, cats }, today) : EMPTY_DASHBOARD),
     [records, today, range, platform, search, tag, cats],
@@ -139,6 +144,7 @@ export function useSentimentData(filters: Filters) {
   return {
     ...dashboard,
     risk,
+    minDate,
     aiModel,
     aiPending,
     today,

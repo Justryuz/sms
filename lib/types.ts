@@ -64,7 +64,16 @@ export interface CommodityRisk {
 
 export type NewSentimentRecord = Omit<SentimentRecord, "id" | "created_at">;
 
-export type DateRange = "today" | "7d" | "30d" | "all";
+export type PresetRange = "today" | "7d" | "30d" | "all";
+
+/** Tempoh yang dipilih: julat pantas, satu hari, satu minggu (Isnin–Ahad) atau julat tersuai. */
+export type DateRange =
+  | { mode: PresetRange }
+  | { mode: "day"; date: string }
+  | { mode: "week"; /** Isnin, YYYY-MM-DD */ start: string }
+  | { mode: "custom"; start: string; end: string };
+
+export type DateMode = DateRange["mode"];
 export type PlatformFilter = "all" | "x" | "tiktok" | "facebook" | "threads" | "instagram" | "web";
 
 export type DimKey = "topic" | "lang" | "sourceType" | "group" | "state";
